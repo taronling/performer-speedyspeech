@@ -23,7 +23,7 @@ optional arguments:
 """
 import argparse, sys, os, time
 import torch
-from librosa.output import write_wav
+from soundfile import write as  write_wav
 
 from speedyspeech import SpeedySpeech
 from melgan.model.generator import Generator
@@ -82,5 +82,5 @@ with torch.no_grad():
 
 print('Saving audio')
 # TODO: cut audios to proper length
-for i,a in enumerate(audio.detach().cpu().numpy()):
-    write_wav(os.path.join(args.audio_folder,f'{i}.wav'), a, HPStft.sample_rate, norm=False)
+for i, a in enumerate(audio.detach().cpu().numpy()):
+    write_wav(file=os.path.join(args.audio_folder,f'{i}.wav'), data=a, samplerate=HPStft.sample_rate)

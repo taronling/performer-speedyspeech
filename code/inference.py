@@ -1,7 +1,9 @@
 """Synthesize audio from text
 
-echo "One sentence. \nAnother sentence. | python code/inference.py checkpoint1 checkpoint2 --device cuda --audio_folder ~/audio
+echo "One sentence. \nAnother sentence." | python code/inference.py checkpoint1 checkpoint2 --device cuda --audio_folder ~/audio
 cat text.txt | python code/inference.py checkpoint1 checkpoint2 --device cuda
+printf "One sentence. \nAnother sentence." | python code/inference.py --device cuda --audio_folder synthesized_audio
+printf "One sentence. \nAnother sentence. \n" | python code/inference.py --device cpu --audio_folder synthesized_audio
 
 Run from the project root.
 Audios are by default saved to ~/audio.
@@ -23,7 +25,7 @@ optional arguments:
 """
 import argparse, sys, os, time
 import torch
-from soundfile import write as  write_wav
+from soundfile import write as write_wav
 
 from speedyspeech import SpeedySpeech
 from melgan.model.generator import Generator

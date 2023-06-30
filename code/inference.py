@@ -2,7 +2,7 @@
 
 Windows Options:
 echo "One sentence. \nAnother sentence." | python code/inference.py checkpoint1 checkpoint2 --device cuda --audio_folder ~/audio
-echo "One sentence. \nAnother sentence." | python code/inference.py --device cuda --audio_folder synthesized_audio
+echo "One sentence. \n Another sentence." | python code/inference.py --device cuda --audio_folder synthesized_audio
 
 Linux Options:
 cat text.txt | python code/inference.py checkpoint1 checkpoint2 --device cuda
@@ -95,6 +95,11 @@ with torch.no_grad():
 print('Saving audio')
 # TODO: cut audios to proper length
 for i, a in enumerate(audio.detach().cpu().numpy()):
+
+    # Make target audio folder if it doesn't already exist
+    if not os.path.exists(args.audio_folder):
+        os.mkdir(args.audio_folder)
+    
     if platform.system() == "Windows":
         write_wav(os.path.join(args.audio_folder,f'{i}.wav'), a, HPStft.sample_rate, norm=False)
     else:

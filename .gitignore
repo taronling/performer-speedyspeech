@@ -12,3 +12,5 @@ audios/
 *.pt
 *.pth
 generate_index.py
+speedyspeech_env/*
+synthesized_audio/*

@@ -1,6 +1,10 @@
 """Synthesize audio from text
 
+Windows Options:
 echo "One sentence. \nAnother sentence." | python code/inference.py checkpoint1 checkpoint2 --device cuda --audio_folder ~/audio
+echo "One sentence. \nAnother sentence." | python code/inference.py --device cuda --audio_folder synthesized_audio
+
+Linux Options:
 cat text.txt | python code/inference.py checkpoint1 checkpoint2 --device cuda
 printf "One sentence. \nAnother sentence." | python code/inference.py --device cuda --audio_folder synthesized_audio
 printf "One sentence. \nAnother sentence. \n" | python code/inference.py --device cpu --audio_folder synthesized_audio
@@ -23,9 +27,9 @@ optional arguments:
   --audio_folder AUDIO_FOLDER
                         Where to save audios
 """
+import platform
 import argparse, sys, os, time
 import torch
-from soundfile import write as write_wav
 
 from speedyspeech import SpeedySpeech
 from melgan.model.generator import Generator
@@ -33,6 +37,12 @@ from melgan.utils.hparams import HParam
 from hparam import HPStft, HPText
 from utils.text import TextProcessor
 from functional import mask
+
+if platform.system() == "Windows":
+    from librosa.output import write_wav
+else:
+    from soundfile import write as write_wav
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--speedyspeech_checkpoint", default='checkpoints/speedyspeech.pth', type=str, help="Checkpoint file for speedyspeech model")
@@ -85,4 +95,7 @@ with torch.no_grad():
 print('Saving audio')
 # TODO: cut audios to proper length
 for i, a in enumerate(audio.detach().cpu().numpy()):
-    write_wav(file=os.path.join(args.audio_folder,f'{i}.wav'), data=a, samplerate=HPStft.sample_rate)
+    if platform.system() == "Windows":
+        write_wav(os.path.join(args.audio_folder,f'{i}.wav'), a, HPStft.sample_rate, norm=False)
+    else:
+        write_wav(file=os.path.join(args.audio_folder,f'{i}.wav'), data=a, samplerate=HPStft.sample_rate)

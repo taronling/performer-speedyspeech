@@ -1,0 +1,16 @@
+Macfix:
+
+Update
+
+- site-packages/tensorboard/compat/tensorflow_stub/dtypes.py
+- site-packages/tensorboard/util/tensor_util.py
+
+From 
+    (np.object, string),
+    (np.bool, bool),
+
+To
+    (object, string),
+    (bool, bool),
+
+For all instances in the file. Don't update things like np.bool_

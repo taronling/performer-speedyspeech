@@ -51,7 +51,7 @@ def window_sumsquare(window, n_frames, hop_length=200, win_length=800,
     # Compute the squared window at the desired length
     win_sq = get_window(window, win_length, fftbins=True)
     win_sq = librosa_util.normalize(win_sq, norm=norm)**2
-    win_sq = librosa_util.pad_center(win_sq, n_fft)
+    win_sq = librosa_util.pad_center(data=win_sq, size=n_fft)
 
     # Fill the envelope
     for i in range(n_frames):
@@ -141,9 +141,9 @@ class STFT(torch.nn.Module):
                 dtype=np.float32)
             # remove modulation effects
             approx_nonzero_indices = torch.tensor(
-                np.where(window_sum > tiny(window_sum))[0])
+                np.where(window_sum > tiny(window_sum))[0].tolist())
             window_sum = torch.autograd.Variable(
-                torch.tensor(window_sum), requires_grad=False)
+                torch.tensor(window_sum.tolist()), requires_grad=False)
             window_sum = window_sum.cuda() if magnitude.is_cuda else window_sum
             inverse_transform[:, :, approx_nonzero_indices] /= window_sum[approx_nonzero_indices]
 

@@ -25,7 +25,7 @@ import itertools
 import torch
 import torch.nn as nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data import DataLoader
 
@@ -297,7 +297,7 @@ class SpeedySpeech(nn.Module):
 
         if self.checkpoint is not None:
             os.remove(self.checkpoint)
-        # self.checkpoint = os.path.join(# self.logger.log_dir, f'{time.strftime("%Y-%m-%d")}_checkpoint_step{self.step}.pth')
+        self.checkpoint = os.path.join(# self.logger.log_dir, f'{time.strftime("%Y-%m-%d")}_checkpoint_step{self.step}.pth')
         torch.save(
             {
                 'epoch': self.epoch,
@@ -325,7 +325,7 @@ class SpeedySpeech(nn.Module):
 
     def fit(self, batch_size, logdir, epochs=1, grad_clip=1, checkpoint_every=10):
         self.grad_clip = grad_clip
-        # self.logger = SummaryWriter(logdir)
+        self.logger = SummaryWriter(logdir)
 
         train_loader = self.train_dataloader(batch_size)
         valid_loader = self.val_dataloader(batch_size)
@@ -337,7 +337,7 @@ class SpeedySpeech(nn.Module):
             valid_losses = self._validate(valid_loader)
 
             self.scheduler.step(sum(valid_losses))
-            # self.logger.add_scalar('train/learning_rate', self.optimizer.param_groups[0]['lr'], self.epoch)
+            self.logger.add_scalar('train/learning_rate', self.optimizer.param_groups[0]['lr'], self.epoch)
 
             if not e % checkpoint_every:
                 self.save()
@@ -369,14 +369,14 @@ class SpeedySpeech(nn.Module):
             t_ssim += ssim.item()
             t_huber += huber.item()
 
-            # self.logger.add_scalar(
-            #     'batch/total', loss.item(), self.epoch * len(dataloader) + i
-            # )
+            self.logger.add_scalar(
+                'batch/total', loss.item(), self.epoch * len(dataloader) + i
+            )
 
         # report average cost per batch
-        # self.logger.add_scalar('train/l1', t_l1 / i, self.epoch)
-        # self.logger.add_scalar('train/ssim', t_ssim / i, self.epoch)
-        # self.logger.add_scalar('train/log(durations)_huber', t_huber / i, self.epoch)
+        self.logger.add_scalar('train/l1', t_l1 / i, self.epoch)
+        self.logger.add_scalar('train/ssim', t_ssim / i, self.epoch)
+        self.logger.add_scalar('train/log(durations)_huber', t_huber / i, self.epoch)
         return t_l1, t_ssim, t_huber
 
     def _validate(self, dataloader):
@@ -404,18 +404,18 @@ class SpeedySpeech(nn.Module):
                                            pred_durations[-1][:estimated_slen[-1], :plen[-1]],
                                            spectrs[-1, :slen[-1]], durations[-1][:slen[-1], :plen[-1]],
                                            text[-1])
-            # self.logger.add_figure(text[-1], fig, self.epoch)
+            self.logger.add_figure(text[-1], fig, self.epoch)
 
             # log audio every 10 epochs
             if not self.epoch % 10:
                 spec = self.collate.norm.inverse(out[-1:]) # TODO: this fails if we do not standardize!
                 sound, length = self.collate.stft.spec2wav(spec.transpose(1, 2), estimated_slen[-1:])
                 sound = sound[0, :length[0]]
-                # self.logger.add_audio(text[-1], sound.detach().cpu().numpy(), self.epoch, sample_rate=22050) # TODO: parameterize
+                self.logger.add_audio(text[-1], sound.detach().cpu().numpy(), self.epoch, sample_rate=22050) # TODO: parameterize
 
         # report average cost per batch
-        # self.logger.add_scalar('valid/l1', t_l1 / i, self.epoch)
-        # self.logger.add_scalar('valid/durations_huber', t_huber / i, self.epoch)
+        self.logger.add_scalar('valid/l1', t_l1 / i, self.epoch)
+        self.logger.add_scalar('valid/durations_huber', t_huber / i, self.epoch)
         return t_l1, t_huber
 
     def train_dataloader(self, batch_size):

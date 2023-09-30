@@ -125,7 +125,7 @@ class MySTFT(torch.nn.Module):
     def griffin_lim(self, magnitudes, n_iters=30):
         angles = np.angle(np.exp(2j * np.pi * np.random.rand(*magnitudes.size())))
         angles = angles.astype(np.float32)
-        angles = torch.autograd.Variable(torch.tensor(angles)).to(magnitudes.device)
+        angles = torch.autograd.Variable(torch.tensor(angles.tolist())).to(magnitudes.device)
         signal = self.stft.inverse(magnitudes, angles).squeeze(1)
 
         for i in range(n_iters):

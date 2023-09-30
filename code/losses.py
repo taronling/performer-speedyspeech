@@ -70,7 +70,7 @@ def l1_dtw(input, ilen, target, tlen):
     s = 0
     total_elem = 0
     for i, t in zip(input, target):
-        dtw, path = fastdtw(i.cpu(), t.cpu(), dist=lambda x, y: np.abs(x-y).sum())
+        dtw, path = fastdtw(i.cpu().tolist(), t.cpu().tolist(), dist=lambda x, y: np.abs(np.array([x.tolist()])-np.array([y.tolist()])).sum())
         s += dtw
         if len(i) > len(t):
             total_elem += i.numel()

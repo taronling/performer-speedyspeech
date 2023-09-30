@@ -29,6 +29,8 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.sampler import SequentialSampler
 from torch.utils.data import DataLoader
 
+import numpy as np
+
 import git
 from barbar import Bar  # progress bar
 
@@ -297,7 +299,7 @@ class SpeedySpeech(nn.Module):
 
         if self.checkpoint is not None:
             os.remove(self.checkpoint)
-        self.checkpoint = os.path.join(# self.logger.log_dir, f'{time.strftime("%Y-%m-%d")}_checkpoint_step{self.step}.pth')
+        self.checkpoint = os.path.join(self.logger.log_dir, f'{time.strftime("%Y-%m-%d")}_checkpoint_step{self.step}.pth')
         torch.save(
             {
                 'epoch': self.epoch,
@@ -395,9 +397,9 @@ class SpeedySpeech(nn.Module):
             t_l1 += l1
             t_huber += huber.item()
 
-            durations = fert2align(durations.cpu().numpy())
+            durations = fert2align(np.array(durations.cpu().tolist()))
             durations = [torch.as_tensor(d) for d in durations]
-            pred_durations = fert2align(pred_durations.cpu().numpy())
+            pred_durations = fert2align(np.array(pred_durations.cpu().tolist()))
             pred_durations = [torch.as_tensor(d) for d in pred_durations]
 
             fig = display_spectr_alignment(out[-1, :estimated_slen[-1]],
@@ -411,7 +413,7 @@ class SpeedySpeech(nn.Module):
                 spec = self.collate.norm.inverse(out[-1:]) # TODO: this fails if we do not standardize!
                 sound, length = self.collate.stft.spec2wav(spec.transpose(1, 2), estimated_slen[-1:])
                 sound = sound[0, :length[0]]
-                self.logger.add_audio(text[-1], sound.detach().cpu().numpy(), self.epoch, sample_rate=22050) # TODO: parameterize
+                self.logger.add_audio(text[-1], sound.detach().cpu(), self.epoch, sample_rate=22050) # TODO: parameterize
 
         # report average cost per batch
         self.logger.add_scalar('valid/l1', t_l1 / i, self.epoch)

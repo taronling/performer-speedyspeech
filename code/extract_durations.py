@@ -21,6 +21,8 @@ import os
 import torch
 import numpy as np
 from barbar import Bar  # progress bar
+from hparam import HPText
+
 
 def save_alignments_as_fertilities(model, dataloader, folder, durations_filename):
     """Save extracted alignments as durations
@@ -95,7 +97,7 @@ def smooth_fertilities(fertilities_improper, slen):
         frames = slen[i]
         extra = ff.sum() - frames
         if extra:
-            n_largest = np.argpartition(f, -extra)[-extra:]  # get `extra` largest fertilities indices
+            n_largest = np.argpartition(f.tolist(), -extra)[-extra:]  # get `extra` largest fertilities indices
             ff[n_largest] -= 1
         smoothed.append(ff)
 
@@ -159,7 +161,7 @@ if __name__ == '__main__':
 
     # Load pretrained checkpoint and extract alignments to data_folder
     m = DurationExtractor().load(args.checkpoint)
-    dataset = AudioDataset(root=args.data_folder, durations=False)
+    dataset = AudioDataset(root=args.data_folder, durations=False, start_idx=0, end_idx=HPText.num_valid)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, collate_fn=Collate(m.device),
                       shuffle=False, sampler=SequentialSampler(dataset))
 

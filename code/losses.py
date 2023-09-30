@@ -23,7 +23,7 @@ class GuidedAttentionLoss(torch.nn.Module):
         """
 
         B, T, N = attention_weights.shape  # batch, time, features
-        y, x = torch.as_tensor(np.mgrid[0:T, 0:N]).float()
+        y, x = torch.as_tensor(np.mgrid[0:T, 0:N].tolist()).float()
 
         t, n = torch.as_tensor(len_rows).float(), torch.as_tensor(len_cols).float()
         penalty = \

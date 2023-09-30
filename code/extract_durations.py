@@ -91,7 +91,7 @@ def smooth_fertilities(fertilities_improper, slen):
 
     smoothed = []
     for i, f in enumerate(fertilities_improper):
-        ff = f.detach().cpu().numpy().copy()
+        ff = np.array(f.detach().cpu().tolist())
         frames = slen[i]
         extra = ff.sum() - frames
         if extra:

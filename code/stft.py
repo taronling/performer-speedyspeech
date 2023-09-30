@@ -9,7 +9,7 @@ from hparam import HPStft as hp
 
 
 def mel_to_stft_torch(mel_spectrs, n_fft):
-    return torch.stack([torch.as_tensor(mel_to_stft(s.cpu().numpy(), n_fft=n_fft, power=1.0))
+    return torch.stack([torch.as_tensor(mel_to_stft(np.array(s.cpu().tolist()), n_fft=n_fft, power=1.0))
                         for s in mel_spectrs]).to(mel_spectrs.device)
 
 
@@ -69,7 +69,7 @@ class MySTFT(torch.nn.Module):
 
         mel_basis = librosa_mel_fn(
             sr=sampling_rate, n_fft=n_fft, n_mels=n_mel, fmin=mel_fmin, fmax=mel_fmax)
-        mel_basis = torch.from_numpy(mel_basis).float()
+        mel_basis = torch.tensor(mel_basis.tolist()).float()
         mel_inverse = torch.pinverse(mel_basis)
         self.register_buffer('mel_basis', mel_basis)
         self.register_buffer('mel_inverse', mel_inverse)
@@ -88,7 +88,7 @@ class MySTFT(torch.nn.Module):
         #[++++][**********][----][++++]
         #[++++][*****][----]00000[++++]
         lens = [len(yy) for yy in y]
-        y = [F.pad(torch.as_tensor(yy[None, None, :]), pad=(0, self.n_fft // 2), mode='reflect').squeeze()
+        y = [F.pad(torch.as_tensor(yy[None, None, :].tolist()), pad=(0, self.n_fft // 2), mode='reflect').squeeze()
              for yy in y]
         y, _ = pad_batch(y, 0)
         y = y.to(self.mel_basis.device)
@@ -125,7 +125,7 @@ class MySTFT(torch.nn.Module):
     def griffin_lim(self, magnitudes, n_iters=30):
         angles = np.angle(np.exp(2j * np.pi * np.random.rand(*magnitudes.size())))
         angles = angles.astype(np.float32)
-        angles = torch.autograd.Variable(torch.from_numpy(angles)).to(magnitudes.device)
+        angles = torch.autograd.Variable(torch.tensor(angles)).to(magnitudes.device)
         signal = self.stft.inverse(magnitudes, angles).squeeze(1)
 
         for i in range(n_iters):

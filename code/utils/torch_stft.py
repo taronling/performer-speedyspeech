@@ -87,7 +87,7 @@ class STFT(torch.nn.Module):
             # get window and zero center pad it to filter_length
             fft_window = get_window(window, win_length, fftbins=True)
             fft_window = pad_center(data=fft_window, size=filter_length)
-            fft_window = torch.from_numpy(fft_window).float()
+            fft_window = torch.tensor(fft_window).float()
 
             # window the bases
             forward_basis *= fft_window
@@ -140,10 +140,10 @@ class STFT(torch.nn.Module):
                 win_length=self.win_length, n_fft=self.filter_length,
                 dtype=np.float32)
             # remove modulation effects
-            approx_nonzero_indices = torch.from_numpy(
+            approx_nonzero_indices = torch.tensor(
                 np.where(window_sum > tiny(window_sum))[0])
             window_sum = torch.autograd.Variable(
-                torch.from_numpy(window_sum), requires_grad=False)
+                torch.tensor(window_sum), requires_grad=False)
             window_sum = window_sum.cuda() if magnitude.is_cuda else window_sum
             inverse_transform[:, :, approx_nonzero_indices] /= window_sum[approx_nonzero_indices]
 

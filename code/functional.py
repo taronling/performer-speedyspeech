@@ -106,15 +106,15 @@ def display_spectr_alignment(spec_supervised, align_supervised, spec_generated, 
     :param alignment: (time, phonemes)
     :return: figure
     """
-    s1 = spec_generated.detach().cpu().numpy().T
-    a1 = align_generated.detach().cpu().numpy().T
-    m1 = np.argmax(a1, axis=0) + s1.shape[0]
-    sa1 = np.concatenate((s1, a1), axis=0)
+    s1 = spec_generated.detach().cpu().T
+    a1 = align_generated.detach().cpu().T
+    m1 = np.argmax(a1.tolist(), axis=0) + s1.shape[0]
+    sa1 = np.concatenate((s1.tolist(), a1.tolist()), axis=0)
 
-    s2 = spec_supervised.detach().cpu().numpy().T
-    a2 = align_supervised.detach().cpu().numpy().T
-    m2 = np.argmax(a2, axis=0) + s2.shape[0]
-    sa2 = np.concatenate((s2, a2), axis=0)
+    s2 = spec_supervised.detach().cpu().T
+    a2 = align_supervised.detach().cpu().T
+    m2 = np.argmax(a2.tolist(), axis=0) + s2.shape[0]
+    sa2 = np.concatenate((s2.tolist(), a2.tolist()), axis=0)
 
     fig, ax = plt.subplots(nrows=2, ncols=1)
     fig.suptitle(text)

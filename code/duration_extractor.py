@@ -22,6 +22,8 @@ optional arguments:
   --name NAME           Append to logdir name
 """
 
+import os
+
 import torch.nn as nn                     # neural networks
 from torch.nn import L1Loss, ZeroPad2d
 from torch.utils.tensorboard import SummaryWriter
@@ -204,8 +206,11 @@ class DurationExtractor(nn.Module):
         self.epoch = 0
         self.step = 0
 
-        repo = git.Repo(search_parent_directories=True)
-        self.git_commit = repo.head.object.hexsha
+        if os.path.exists('.git'):
+            print('Operating within a git repo')
+            repo_path = '.git'
+            repo = git.Repo(repo_path, search_parent_directories=True)
+            self.git_commit = repo.head.object.hexsha
 
     def to_device(self, device):
         print(f'Sending network to {device}')
@@ -514,10 +519,26 @@ if __name__ == '__main__':
     parser.add_argument("--name", default="", type=str, help="Append to logdir name")
     args = parser.parse_args()
 
+    try:
+        if torch.backends.mps.is_available():
+            device = 'mps'
+        elif torch.cuda.is_available():
+            device = 'cuda'
+            torch.cuda.empty_cache()
+        else:
+            device = 'cpu'
+
+    except:
+        if torch.cuda.is_available():
+            device = 'cuda'
+            torch.cuda.empty_cache()
+        else:
+            device = 'cpu'
+
     m = DurationExtractor(
         adam_lr=0.002,
         warmup_epochs=30,
-        device='cuda' if torch.cuda.is_available() else 'cpu'
+        device=device
     )
 
     logdir = os.path.join('logs', time.strftime("%Y-%m-%dT%H-%M-%S") + '-' + args.name)

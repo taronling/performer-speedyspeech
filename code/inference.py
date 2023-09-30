@@ -30,6 +30,7 @@ optional arguments:
 import platform
 import argparse, sys, os, time
 import torch
+import numpy as np
 
 from speedyspeech import SpeedySpeech
 from melgan.model.generator import Generator
@@ -94,7 +95,7 @@ with torch.no_grad():
 
 print('Saving audio')
 # TODO: cut audios to proper length
-for i, a in enumerate(audio.detach().cpu().numpy()):
+for i, a in enumerate(np.array(audio.detach().cpu().tolist())):
 
     # Make target audio folder if it doesn't already exist
     if not os.path.exists(args.audio_folder):

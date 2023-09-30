@@ -23,6 +23,7 @@ optional arguments:
 """
 
 import os
+import sys
 
 import torch.nn as nn                     # neural networks
 from torch.nn import L1Loss, ZeroPad2d
@@ -211,6 +212,9 @@ class DurationExtractor(nn.Module):
             repo_path = '.git'
             repo = git.Repo(repo_path, search_parent_directories=True)
             self.git_commit = repo.head.object.hexsha
+        else:
+            print(os.getcwd())
+            sys.exit()
 
     def to_device(self, device):
         print(f'Sending network to {device}')
@@ -381,7 +385,7 @@ class DurationExtractor(nn.Module):
 
         return dec[:, 1:, :], weights
 
-    def fit(self, batch_size, logdir, epochs=1, grad_clip=1, checkpoint_every=10):
+    def fit(self, batch_size, logdir, epochs=1, grad_clip=1, checkpoint_every=3):
         self.grad_clip = grad_clip
         self.logger = SummaryWriter(logdir)
 
@@ -465,7 +469,7 @@ class DurationExtractor(nn.Module):
                 spec = self.collate.norm.inverse(out[-1:]) # TODO: this fails if we do not standardize!
                 sound, length = self.collate.stft.spec2wav(spec.transpose(1, 2), slen[-1:])
                 sound = sound[0, :length[0]]
-                self.logger.add_audio(text[-1], sound.detach().cpu().numpy(), self.epoch, sample_rate=22050) # TODO: parameterize
+                self.logger.add_audio(text[-1], sound.detach().cpu(), self.epoch, sample_rate=22050) # TODO: parameterize
 
         # report average cost per batch
         self.logger.add_scalar('valid/l1', t_l1 / i, self.epoch)

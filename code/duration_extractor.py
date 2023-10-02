@@ -40,6 +40,8 @@ from losses import l1_masked, GuidedAttentionLoss
 from hparam import HPDurationExtractor as hp
 from hparam import HPStft, HPText
 
+from rotary import Rotary, apply_rotary_pos_emb
+
 from utils.augment import add_random_noise, degrade_some, frame_dropout
 from utils.optim import NoamScheduler
 from utils.transform import MinMaxNorm
@@ -189,6 +191,9 @@ class DurationExtractor(nn.Module):
         self.attention = ScaledDotAttention()
         self.collate = Collate(device=device)
 
+        if hp.positional_encoding == 'rotary':
+            self.rotary = Rotary(dim=hp.att_hidden_channels)
+
         # optim
         self.optimizer = torch.optim.Adam(self.parameters(), lr=adam_lr)
         self.scheduler = NoamScheduler(self.optimizer, warmup_epochs, init_scale)
@@ -267,9 +272,13 @@ class DurationExtractor(nn.Module):
                         lengths=len_phonemes,
                         dim=-1).to(self.device)
 
-        if hp.positional_encoding:
+        if hp.positional_encoding == 'fourier':
             keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
             queries += positional_encoding(queries.shape[-1], queries.shape[1], w=1).to(self.device)
+        elif hp.positional_encoding == 'rotary':
+            # Rotary Positional Encodings
+            cos, sin = self.rotary(queries)  # Assuming queries and keys have the same shape
+            queries, keys = apply_rotary_pos_emb(queries, keys, cos, sin)
 
         attention, weights = self.attention(queries, keys, values, mask=att_mask)
         decoded = self.audio_decoder(attention + queries)

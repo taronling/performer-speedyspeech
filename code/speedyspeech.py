@@ -44,6 +44,8 @@ from stft import MySTFT, pad_batch
 from hparam import HPFertility as hp
 from hparam import HPStft, HPText
 
+from rotary import Rotary, apply_rotary_pos_emb
+
 from utils.transform import map_to_tensors, Pad, StandardNorm
 from utils.text import TextProcessor
 
@@ -293,6 +295,8 @@ class SpeedySpeech(nn.Module):
                 encodings += self.pad(expand_positional_encodings(durations, encodings.shape[-1])).to(encodings.device)
             elif hp.pos_enc == 'standard':
                 encodings += positional_encoding(encodings.shape[-1], encodings.shape[1]).to(encodings.device)
+            elif hp.pos_enc == 'rotary':
+                ...
         return encodings
 
     def save(self):

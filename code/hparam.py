@@ -49,7 +49,7 @@ class HPFertility:
 
 
 class HPDurationExtractor:
-    positional_encoding = True
+    positional_encoding = 'rotary' # fourier, rotary
     w = 6.42
     sigma = 0.3  # weight for guided attention
     scale_min, scale_max = 0, 1  # mel_spectr values will be scaled to this interval

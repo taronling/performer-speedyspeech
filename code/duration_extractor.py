@@ -24,6 +24,7 @@ optional arguments:
 
 import os
 import sys
+from logzero import logfile, logger
 
 import torch.nn as nn                     # neural networks
 from torch.nn import L1Loss, ZeroPad2d
@@ -314,9 +315,12 @@ class DurationExtractor(nn.Module):
             phonemes = torch.as_tensor(phonemes)
             keys, values = self.txt_encoder(phonemes)
 
-            if hp.positional_encoding:
+            if hp.positional_encoding == 'fourier':
                 keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
                 pe = positional_encoding(hp.channels, steps, w=1).to(self.device)
+            elif hp.positional_encoding == 'rotary':
+                keys = self.rotary.rotate_queries_or_keys(keys)
+
 
             if spectrograms is None:
                 dec = torch.zeros(len(phonemes), 1, hp.out_channels, device=self.device)
@@ -342,6 +346,8 @@ class DurationExtractor(nn.Module):
 
                 if hp.positional_encoding == 'fourier': 
                     queries += pe[i]
+                elif hp.positional_encoding == 'rotary':
+                    queries = self.rotary.rotate_queries_or_keys(queries)
 
                 att, w = self.attention(queries, keys, values, att_mask)
                 dec = self.audio_decoder(att + queries)
@@ -364,9 +370,12 @@ class DurationExtractor(nn.Module):
 
             keys, values = self.txt_encoder(phonemes)
 
-            if hp.positional_encoding:
+            if hp.positional_encoding == 'fourier':
                 keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
                 pe = positional_encoding(hp.channels, steps, w=1).to(self.device)
+
+            elif hp.positional_encoding == 'rotary':
+                keys = self.rotary.rotate_queries_or_keys(keys)
 
             dec = torch.zeros(len(phonemes), 1, hp.out_channels, device=self.device)
 
@@ -379,8 +388,10 @@ class DurationExtractor(nn.Module):
             for i in range(steps):
                 print(i)
                 queries = self.audio_encoder(dec)
-                if hp.positional_encoding:
+                if hp.positional_encoding == 'fourier':
                     queries += pe[i]
+                elif hp.positional_encoding == 'rotary':
+                    queries = self.rotary.rotate_queries_or_keys(queries)
 
                 att, w = self.attention(queries, keys, values, att_mask)
                 d = self.audio_decoder(att + queries)
@@ -412,7 +423,7 @@ class DurationExtractor(nn.Module):
             if not e % checkpoint_every:
                 self.save()
 
-            print(f'Epoch {e} | Train - l1: {train_losses[0]}, guided_att: {train_losses[1]}| '
+            logger.info(f'Epoch {e} | Train - l1: {train_losses[0]}, guided_att: {train_losses[1]}| '
                   f'Valid - l1: {valid_losses[0]}, guided_att: {valid_losses[1]}|')
 
     def _train_epoch(self, dataloader):
@@ -559,6 +570,18 @@ if __name__ == '__main__':
         m.load(args.from_checkpoint)
         # use the folder with checkpoint as a logdir
         logdir = os.path.dirname(args.from_checkpoint)
+
+    if not os.path.exists(logdir):
+        os.mkdir(logdir)
+
+    logfile(logdir + '/model_training.log')
+    logger.info('''
+        Batch size: {}
+        Positional Encoding: {}
+        '''.format(
+            args.batch_size, hp.positional_encoding
+        )
+    )
 
     m.fit(
         epochs=args.epochs,

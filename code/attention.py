@@ -91,4 +91,10 @@ class FastAttention(nn.Module):
 
         attention = linear_attention(q, k, v)
         attention = torch.squeeze(attention, 0)
+
+        try:
+            print(torch.mps.current_allocated_memory() / torch.mps.driver_allocated_memory())
+        except:
+            pass
+
         return attention, weights

@@ -374,7 +374,7 @@ class DurationExtractor(nn.Module):
                     att, w = self.attention.forward(queries, keys, values, att_mask)
                 elif hp.attention == 'scaled_dot':
                     att, w = self.attention(queries, keys, values, att_mask)
-                    
+
                 d = self.audio_decoder(att + queries)
                 d = d[:, -1:]
                 w = w[:, -1:]
@@ -425,7 +425,8 @@ class DurationExtractor(nn.Module):
             l_att = self.loss_att(att_weights, slen, plen)
 
             loss = l1 + l_att
-            loss.backward()
+            with torch.no_grad():
+                loss.backward()
             torch.nn.utils.clip_grad_norm_(self.parameters(), self.grad_clip)
             self.optimizer.step()
             self.step += 1
@@ -539,6 +540,9 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
         else:
             device = 'cpu'
+
+    if device != 'mps':
+        torch.autograd.set_detect_anomaly(True)
 
     m = DurationExtractor(
         adam_lr=0.002,

@@ -26,7 +26,7 @@ import os
 import sys
 from logzero import logfile, logger
 
-import torch.nn as nn                     # neural networks
+import torch.nn as nn # neural networks
 from torch.nn import L1Loss, ZeroPad2d
 from torch.utils.tensorboard import SummaryWriter
 import torch
@@ -35,12 +35,13 @@ import git
 from barbar import Bar  # progress bar
 
 from layers import WaveResidualBlock, Conv1d
-from functional import positional_encoding, median_mask, mask, idx_mask, scaled_dot_attention, display_spectr_alignment
+from functional import positional_encoding, median_mask, mask, idx_mask, display_spectr_alignment
 from losses import l1_masked, GuidedAttentionLoss
 
 from hparam import HPDurationExtractor as hp
 from hparam import HPStft, HPText
 
+from attention import ScaledDotAttention, FastAttention
 from rotary_embedding_torch import RotaryEmbedding
 
 from utils.augment import add_random_noise, degrade_some, frame_dropout
@@ -53,6 +54,7 @@ from torch.utils.data import DataLoader
 
 from stft import MySTFT, pad_batch
 from torch.utils.data.sampler import SequentialSampler
+
 
 class ConvTextEncoder(nn.Module):
     """Encodes input phonemes into keys and values"""
@@ -138,42 +140,6 @@ class ConvAudioDecoder(nn.Module):
         return self.layers(x)
 
 
-class ScaledDotAttention(nn.Module):
-    """Scaled dot attention with positional encoding preconditioning"""
-
-    def __init__(self):
-        super(ScaledDotAttention, self).__init__()
-
-        self.noise = hp.att_noise
-        self.fc_query = Conv1d(hp.channels, hp.att_hidden_channels)
-        self.fc_keys = Conv1d(hp.channels, hp.att_hidden_channels)
-
-        # share parameters
-        self.fc_keys.weight = torch.nn.Parameter(self.fc_query.weight.clone())
-        self.fc_keys.bias = torch.nn.Parameter(self.fc_query.bias.clone())
-
-        self.fc_values = Conv1d(hp.channels, hp.att_hidden_channels)
-        self.fc_out = Conv1d(hp.att_hidden_channels, hp.channels)
-
-    def forward(self, q, k, v, mask=None):
-        """
-        :param q: queries, (batch, time1, channels1)
-        :param k: keys, (batch, time2, channels1)
-        :param v: values, (batch, time2, channels2)
-        :param mask: boolean mask, (batch, time1, time2)
-        :return: (batch, time1, channels2), (batch, time1, time2)
-        """
-
-        noise = self.noise if self.training else 0
-
-        alignment, weights = scaled_dot_attention(self.fc_query(q),
-                                                  self.fc_keys(k),
-                                                  self.fc_values(v),
-                                                  mask, noise=noise)
-        alignment = self.fc_out(alignment)
-        return alignment, weights
-
-
 class DurationExtractor(nn.Module):
     """The teacher model for duration extraction"""
     def __init__(
@@ -189,7 +155,12 @@ class DurationExtractor(nn.Module):
         self.txt_encoder = ConvTextEncoder()
         self.audio_encoder = ConvAudioEncoder()
         self.audio_decoder = ConvAudioDecoder()
-        self.attention = ScaledDotAttention()
+
+        if hp.attention == 'scaled_dot':
+            self.attention = ScaledDotAttention()
+        elif hp.attention == 'fast':
+            self.attention = FastAttention(dim_heads=hp.channels)
+
         self.collate = Collate(device=device)
 
         if hp.positional_encoding == 'rotary':
@@ -281,7 +252,10 @@ class DurationExtractor(nn.Module):
             queries = self.rotary.rotate_queries_or_keys(queries)
             keys = self.rotary.rotate_queries_or_keys(keys)
 
-        attention, weights = self.attention(queries, keys, values, mask=att_mask)
+        if hp.attention == 'fast':
+            attention, weights = self.attention.forward(queries, keys, values, mask=att_mask)
+        # elif hp.attention == 'scaled_dot':
+        #     attention, weights = self.attention(queries, keys, values, mask=att_mask)
         decoded = self.audio_decoder(attention + queries)
         return decoded, weights
 
@@ -321,7 +295,6 @@ class DurationExtractor(nn.Module):
             elif hp.positional_encoding == 'rotary':
                 keys = self.rotary.rotate_queries_or_keys(keys)
 
-
             if spectrograms is None:
                 dec = torch.zeros(len(phonemes), 1, hp.out_channels, device=self.device)
             else:
@@ -349,7 +322,11 @@ class DurationExtractor(nn.Module):
                 elif hp.positional_encoding == 'rotary':
                     queries = self.rotary.rotate_queries_or_keys(queries)
 
-                att, w = self.attention(queries, keys, values, att_mask)
+                if hp.attention == 'fast':
+                    att, w = self.attention.forward(queries, keys, values, att_mask)
+                elif hp.attention == 'scaled_dot':
+                    att, w = self.attention(queries, keys, values, att_mask)
+                
                 dec = self.audio_decoder(att + queries)
                 weights = w if weights is None else torch.cat((weights, w), dim=1)
                 decoded = dec if decoded is None else torch.cat((decoded, dec), dim=1)
@@ -393,7 +370,11 @@ class DurationExtractor(nn.Module):
                 elif hp.positional_encoding == 'rotary':
                     queries = self.rotary.rotate_queries_or_keys(queries)
 
-                att, w = self.attention(queries, keys, values, att_mask)
+                if hp.attention == 'fast':
+                    att, w = self.attention.forward(queries, keys, values, att_mask)
+                elif hp.attention == 'scaled_dot':
+                    att, w = self.attention(queries, keys, values, att_mask)
+                    
                 d = self.audio_decoder(att + queries)
                 d = d[:, -1:]
                 w = w[:, -1:]
@@ -578,8 +559,9 @@ if __name__ == '__main__':
     logger.info('''
         Batch size: {}
         Positional Encoding: {}
+        Attention: {}
         '''.format(
-            args.batch_size, hp.positional_encoding
+            args.batch_size, hp.positional_encoding, hp.attention
         )
     )
 

@@ -528,7 +528,7 @@ if __name__ == '__main__':
     import torch
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=16, type=int, help="Batch size")
+    parser.add_argument("--batch_size", default=64, type=int, help="Batch size")
     parser.add_argument("--epochs", default=300, type=int, help="Training epochs")
     parser.add_argument("--grad_clip", default=1, type=int, help="Gradient clipping value")
     parser.add_argument("--adam_lr", default=0.002, type=int, help="Initial learning rate for adam")
@@ -563,8 +563,8 @@ if __name__ == '__main__':
     m = DurationExtractor(
         positional_encoding=args.pos_enc,
         attention_mechanism=args.attn,
-        adam_lr=0.002,
-        warmup_epochs=30,
+        adam_lr=args.adam_lr,
+        warmup_epochs=args.warmup_epochs,
         device=device
     )
 

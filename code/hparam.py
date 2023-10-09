@@ -24,15 +24,15 @@ class HPStft:
 class HPText:
     # needed to make independent on the directory from which python is invoked
     dataset = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datasets/data/LJSpeech-1.1')
-    num_train, num_valid = 500, 750  # train will use (0, 13000), valid wil use (13000, 13099)
+    num_train, num_valid = 13000, 13099  # train will use (0, 13000), valid wil use (13000, 13099)
 
     punctuation = list("'\",.:?!")
     graphemes = ["<pad>", "<unk>"] + list('abcdefghijklmnopqrstuvwxyz ') + punctuation
     # graphemes_czech = ["<pad>", "<unk>"] + list('aábcčdďeěfghiíjklmnňoópqrřsštťuůúvwxyýzž ') + punctuation
     use_phonemes = True
 
-class HPFertility:
 
+class HPFertility:
     separate_duration_grad = True
     out_channels = HPStft.n_mel
     alphabet_size = len(TextProcessor.phonemes) if HPText.use_phonemes else len(HPText.graphemes)
@@ -49,7 +49,7 @@ class HPFertility:
 
 
 class HPDurationExtractor:
-    positional_encoding = 'rotary' # fourier, rotary
+    positional_encoding = ['fourier', 'rotary'][1] # fourier, rotary
     attention = ['scaled_dot', 'fast'][1]
     w = 6.42
     sigma = 0.3  # weight for guided attention

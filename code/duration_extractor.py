@@ -144,6 +144,8 @@ class DurationExtractor(nn.Module):
     """The teacher model for duration extraction"""
     def __init__(
             self,
+            positional_encoding,
+            attention_mechanism,
             adam_lr=0.002,
             warmup_epochs=30,
             init_scale=0.25,
@@ -152,18 +154,21 @@ class DurationExtractor(nn.Module):
     ):
         super(DurationExtractor, self).__init__()
 
+        self.positional_encoding = positional_encoding
+        self.attention_mechanism = attention_mechanism
+
         self.txt_encoder = ConvTextEncoder()
         self.audio_encoder = ConvAudioEncoder()
         self.audio_decoder = ConvAudioDecoder()
 
-        if hp.attention == 'scaled_dot':
+        if self.attention_mechanism == 'scaled_dot':
             self.attention = ScaledDotAttention()
-        elif hp.attention == 'fast':
+        elif self.attention_mechanism == 'fast':
             self.attention = FastAttention(dim_heads=hp.channels)
 
         self.collate = Collate(device=device)
 
-        if hp.positional_encoding == 'rotary':
+        if self.positional_encoding == 'rotary':
             self.rotary = RotaryEmbedding(dim=hp.channels)
 
         # optim
@@ -244,17 +249,17 @@ class DurationExtractor(nn.Module):
                         lengths=len_phonemes,
                         dim=-1).to(self.device)
 
-        if hp.positional_encoding == 'fourier':
+        if self.positional_encoding == 'fourier':
             keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
             queries += positional_encoding(queries.shape[-1], queries.shape[1], w=1).to(self.device)
-        elif hp.positional_encoding == 'rotary':
+        elif self.positional_encoding == 'rotary':
             # Rotary Positional Encodings
             queries = self.rotary.rotate_queries_or_keys(queries)
             keys = self.rotary.rotate_queries_or_keys(keys)
 
-        if hp.attention == 'fast':
+        if self.attention_mechanism == 'fast':
             attention, weights = self.attention.forward(queries, keys, values, mask=att_mask)
-        elif hp.attention == 'scaled_dot':
+        elif self.attention_mechanism == 'scaled_dot':
             attention, weights = self.attention(queries, keys, values, mask=att_mask)
         decoded = self.audio_decoder(attention + queries)
 
@@ -290,10 +295,10 @@ class DurationExtractor(nn.Module):
             phonemes = torch.as_tensor(phonemes)
             keys, values = self.txt_encoder(phonemes)
 
-            if hp.positional_encoding == 'fourier':
+            if self.positional_encoding == 'fourier':
                 keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
                 pe = positional_encoding(hp.channels, steps, w=1).to(self.device)
-            elif hp.positional_encoding == 'rotary':
+            elif self.positional_encoding == 'rotary':
                 keys = self.rotary.rotate_queries_or_keys(keys)
 
             if spectrograms is None:
@@ -318,17 +323,17 @@ class DurationExtractor(nn.Module):
                 else:
                     queries = self.audio_encoder(input[:, i:i+1, :])
 
-                if hp.positional_encoding == 'fourier': 
+                if self.positional_encoding == 'fourier': 
                     queries += pe[i]
-                elif hp.positional_encoding == 'rotary':
+                elif self.positional_encoding == 'rotary':
                     queries = self.rotary.rotate_queries_or_keys(queries)
 
-                if hp.attention == 'fast':
+                if self.attention_mechanism == 'fast':
                     att, w = self.attention.forward(queries, keys, values, att_mask)
                     # logger.info(w)
                     # logger.info(w.shape)
                     # sys.exit()
-                elif hp.attention == 'scaled_dot':
+                elif self.attention_mechanism == 'scaled_dot':
                     att, w = self.attention(queries, keys, values, att_mask)
                     # logger.info(w)
                     # logger.info(w.shape)
@@ -354,11 +359,11 @@ class DurationExtractor(nn.Module):
 
             keys, values = self.txt_encoder(phonemes)
 
-            if hp.positional_encoding == 'fourier':
+            if self.positional_encoding == 'fourier':
                 keys += positional_encoding(keys.shape[-1], keys.shape[1], w=hp.w).to(self.device)
                 pe = positional_encoding(hp.channels, steps, w=1).to(self.device)
 
-            elif hp.positional_encoding == 'rotary':
+            elif self.positional_encoding == 'rotary':
                 keys = self.rotary.rotate_queries_or_keys(keys)
 
             dec = torch.zeros(len(phonemes), 1, hp.out_channels, device=self.device)
@@ -372,14 +377,14 @@ class DurationExtractor(nn.Module):
             for i in range(steps):
                 print(i)
                 queries = self.audio_encoder(dec)
-                if hp.positional_encoding == 'fourier':
+                if self.positional_encoding == 'fourier':
                     queries += pe[i]
-                elif hp.positional_encoding == 'rotary':
+                elif self.positional_encoding == 'rotary':
                     queries = self.rotary.rotate_queries_or_keys(queries)
 
-                if hp.attention == 'fast':
+                if self.attention_mechanism == 'fast':
                     att, w = self.attention.forward(queries, keys, values, att_mask)
-                elif hp.attention == 'scaled_dot':
+                elif self.attention_mechanism == 'scaled_dot':
                     att, w = self.attention(queries, keys, values, att_mask)
 
                 d = self.audio_decoder(att + queries)
@@ -530,8 +535,8 @@ if __name__ == '__main__':
     parser.add_argument("--warmup_epochs", default=30, type=int, help="Warmup epochs for NoamScheduler")
     parser.add_argument("--from_checkpoint", default=False, type=str, help="Checkpoint file path")
     parser.add_argument("--name", default="", type=str, help="Append to logdir name")
-    parser.add_argument("--pos_enc", default=hp.positional_encoding, type=int, help="Position Encoding")
-    parser.add_argument("--attn", default=hp.attention, type=int, help="Attention Mechanism")
+    parser.add_argument("--pos_enc", default=hp.positional_encoding, type=str, help="Position Encoding")
+    parser.add_argument("--attn", default=hp.attention, type=str, help="Attention Mechanism")
 
     args = parser.parse_args()
 
@@ -556,6 +561,8 @@ if __name__ == '__main__':
         torch.autograd.set_detect_anomaly(True)
 
     m = DurationExtractor(
+        positional_encoding=args.pos_enc,
+        attention_mechanism=args.attn,
         adam_lr=0.002,
         warmup_epochs=30,
         device=device
@@ -576,7 +583,7 @@ if __name__ == '__main__':
         Positional Encoding: {}
         Attention: {}
         '''.format(
-            args.batch_size, hp.positional_encoding, hp.attention
+            args.batch_size, args.pos_enc, args.attn
         )
     )
 

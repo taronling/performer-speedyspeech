@@ -254,9 +254,10 @@ class DurationExtractor(nn.Module):
 
         if hp.attention == 'fast':
             attention, weights = self.attention.forward(queries, keys, values, mask=att_mask)
-        # elif hp.attention == 'scaled_dot':
-        #     attention, weights = self.attention(queries, keys, values, mask=att_mask)
+        elif hp.attention == 'scaled_dot':
+            attention, weights = self.attention(queries, keys, values, mask=att_mask)
         decoded = self.audio_decoder(attention + queries)
+
         return decoded, weights
 
     def generating(self, mode):
@@ -324,8 +325,14 @@ class DurationExtractor(nn.Module):
 
                 if hp.attention == 'fast':
                     att, w = self.attention.forward(queries, keys, values, att_mask)
+                    # logger.info(w)
+                    # logger.info(w.shape)
+                    # sys.exit()
                 elif hp.attention == 'scaled_dot':
                     att, w = self.attention(queries, keys, values, att_mask)
+                    # logger.info(w)
+                    # logger.info(w.shape)
+                    # sys.exit()
                 
                 dec = self.audio_decoder(att + queries)
                 weights = w if weights is None else torch.cat((weights, w), dim=1)
@@ -516,18 +523,22 @@ if __name__ == '__main__':
     import torch
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--batch_size", default=64, type=int, help="Batch size")
+    parser.add_argument("--batch_size", default=16, type=int, help="Batch size")
     parser.add_argument("--epochs", default=300, type=int, help="Training epochs")
     parser.add_argument("--grad_clip", default=1, type=int, help="Gradient clipping value")
     parser.add_argument("--adam_lr", default=0.002, type=int, help="Initial learning rate for adam")
     parser.add_argument("--warmup_epochs", default=30, type=int, help="Warmup epochs for NoamScheduler")
     parser.add_argument("--from_checkpoint", default=False, type=str, help="Checkpoint file path")
     parser.add_argument("--name", default="", type=str, help="Append to logdir name")
+    parser.add_argument("--pos_enc", default=hp.positional_encoding, type=int, help="Position Encoding")
+    parser.add_argument("--attn", default=hp.attention, type=int, help="Attention Mechanism")
+
     args = parser.parse_args()
 
     try:
         if torch.backends.mps.is_available():
             device = 'mps'
+            torch.backends.mps.empty_cache()
         elif torch.cuda.is_available():
             device = 'cuda'
             torch.cuda.empty_cache()

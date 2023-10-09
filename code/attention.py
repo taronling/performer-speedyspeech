@@ -77,11 +77,6 @@ class FastAttention(nn.Module):
     def forward(self, q, k, v, mask=None):
         device = q.device
 
-        weights = torch.matmul(q, k.transpose(2, 1))
-
-        if mask is not None:
-            weights = weights.masked_fill(~mask, float('-inf'))
-
         q = q[None, :]
         k = k[None, :]
 
@@ -89,13 +84,18 @@ class FastAttention(nn.Module):
         q = create_kernel(q, is_query = True)
         k = create_kernel(k, is_query = False)
 
-        attention = linear_attention(q, k, v)
-        attention = torch.squeeze(attention, 0)
-        attention.detach()
+        weights = torch.matmul(q, k.transpose(2, 3))
 
-        try:
-            print(round(torch.mps.current_allocated_memory() / torch.mps.driver_allocated_memory(), 2)*100, '%')
-        except:
-            pass
+        if mask is not None:
+            weights = torch.squeeze(weights, 0)
 
-        return attention, weights
+        alignment = linear_attention(q, k, v)
+        alignment = torch.squeeze(alignment, 0)
+        alignment.detach()
+
+        # try:
+        #     print(round(torch.mps.current_allocated_memory() / torch.mps.driver_allocated_memory(), 2)*100, '%')
+        # except:
+        #     pass
+
+        return alignment, weights

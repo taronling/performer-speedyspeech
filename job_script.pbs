@@ -1,6 +1,6 @@
 #PBS -P VUR                 
-#PBS -l select=1:ncpus=1:ngpus=2:mem=10GB
-#PBS -l walltime=15:00:00
+#PBS -l select=1:ncpus=1:ngpus=2:mem=8GB
+#PBS -l walltime=10:00:00
 #PBS -M taronling@gmail.com
 #PBS -m abe
 

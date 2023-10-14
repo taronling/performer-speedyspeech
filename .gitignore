@@ -14,3 +14,5 @@ audios/
 generate_index.py
 speedyspeech_env/*
 synthesized_audio/*
+tts/
+.python-version

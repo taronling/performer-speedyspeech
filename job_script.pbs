@@ -1,10 +1,13 @@
 #PBS -P VUR                 
-#PBS -l select=1:ncpus=1:ngpus=1:mem=16GB
-#PBS -l walltime=10:00:00   
+#PBS -l select=1:ncpus=2:ngpus=2:mem=10GB
+#PBS -l walltime=15:00:00
+#PBS -M taronling@gmail.com
+#PBS -m abe
 
+export PYTHONPATH=/project/VUR/mypythonpackages:$PYTHONPATH
 source /project/VUR/torchenv/bin/activate
 export TMPDIR=/project/VUR/torchenv/tmp
-module load python/3.9.15 magma/2.5.3 openmpi-gcc/3.1.5 cuda/10.2.89 gcc/12.1.0 openssl anaconda/4.2.0
-cd /project/VUR/tlin6895/PerformerSpeedySpeech
+module load python/3.9.15 magma/2.5.3 openmpi-gcc/3.1.5 cuda/10.2.89 gcc/12.1.0 openssl mpich
+cd /scratch/VUR/tlin6895/PerformerSpeedySpeech
 
 python code/duration_extractor.py --batch_size=64 --attn=fast --pos_enc=rotary

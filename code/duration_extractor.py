@@ -30,6 +30,7 @@ import torch.nn as nn # neural networks
 from torch.nn import L1Loss, ZeroPad2d
 from torch.utils.tensorboard import SummaryWriter
 import torch
+import torch.distributed as dist
 
 import git
 from barbar import Bar  # progress bar
@@ -37,6 +38,7 @@ from barbar import Bar  # progress bar
 from layers import WaveResidualBlock, Conv1d
 from functional import positional_encoding, median_mask, mask, idx_mask, display_spectr_alignment
 from losses import l1_masked, GuidedAttentionLoss
+from utils.parallel_wrapper import DistributedDataParallel
 
 from hparam import HPDurationExtractor as hp
 from hparam import HPStft, HPText
@@ -149,8 +151,7 @@ class DurationExtractor(nn.Module):
             adam_lr=0.002,
             warmup_epochs=30,
             init_scale=0.25,
-            guided_att_sigma=0.3,
-            device='cuda'
+            guided_att_sigma=0.3
     ):
         super(DurationExtractor, self).__init__()
 
@@ -179,27 +180,22 @@ class DurationExtractor(nn.Module):
         self.loss_l1 = l1_masked
         self.loss_att = GuidedAttentionLoss(guided_att_sigma)
 
-        # device
-        self.device=device
-        self.to(self.device)
-        print(f'Model sent to {self.device}')
-
         # helper vars
         self.checkpoint = None
         self.epoch = 0
         self.step = 0
 
         if os.path.exists('.git'):
-            print('Operating within a git repo')
+            logger.info('Operating within a git repo')
             repo_path = '.git'
             repo = git.Repo(repo_path, search_parent_directories=True)
             self.git_commit = repo.head.object.hexsha
         else:
-            print(os.getcwd())
+            logger.info(os.getcwd())
             sys.exit()
 
     def to_device(self, device):
-        print(f'Sending network to {device}')
+        logger.info(f'Sending network to {device}')
         self.device = device
         self.to(device)
         return self
@@ -230,7 +226,7 @@ class DurationExtractor(nn.Module):
 
         commit = checkpoint['git_commit']
         if commit != self.git_commit:
-            print(f'Warning: the loaded checkpoint was trained on commit {commit}, but you are on {self.git_commit}')
+            logger.warn(f'Warning: the loaded checkpoint was trained on commit {commit}, but you are on {self.git_commit}')
         self.checkpoint = None  # prevent overriding old checkpoint
         return self
 
@@ -375,7 +371,6 @@ class DurationExtractor(nn.Module):
                             dim=-1).to(self.device)
 
             for i in range(steps):
-                print(i)
                 queries = self.audio_encoder(dec)
                 if self.positional_encoding == 'fourier':
                     queries += pe[i]
@@ -529,10 +524,10 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size")
-    parser.add_argument("--epochs", default=300, type=int, help="Training epochs")
+    parser.add_argument("--epochs", default=50, type=int, help="Training epochs")
     parser.add_argument("--grad_clip", default=1, type=int, help="Gradient clipping value")
-    parser.add_argument("--adam_lr", default=0.002, type=int, help="Initial learning rate for adam")
-    parser.add_argument("--warmup_epochs", default=30, type=int, help="Warmup epochs for NoamScheduler")
+    parser.add_argument("--adam_lr", default=0.0025, type=int, help="Initial learning rate for adam")
+    parser.add_argument("--warmup_epochs", default=10, type=int, help="Warmup epochs for NoamScheduler")
     parser.add_argument("--from_checkpoint", default=False, type=str, help="Checkpoint file path")
     parser.add_argument("--name", default="", type=str, help="Append to logdir name")
     parser.add_argument("--pos_enc", default=hp.positional_encoding, type=str, help="Position Encoding")
@@ -564,9 +559,20 @@ if __name__ == '__main__':
         positional_encoding=args.pos_enc,
         attention_mechanism=args.attn,
         adam_lr=args.adam_lr,
-        warmup_epochs=args.warmup_epochs,
-        device=device
+        warmup_epochs=args.warmup_epochs
     )
+
+    if torch.cuda.device_count() > 1:
+        logger.info("Using: ", str(torch.cuda.device_count()), "GPUs")
+        logger.info("Increasing batch size: {} -> {}".format(
+            str(args.batch_size), 
+            str(args.batch_size * torch.cuda.device_count())))
+        batch_size = args.batch_size * torch.cuda.device_count()
+    else:
+        batch_size = args.batch_size
+
+    m = DistributedDataParallel(m)
+    m = m.to_device(device)
 
     logdir = os.path.join('logs', time.strftime("%Y-%m-%dT%H-%M-%S") + '-' + args.name)
     if args.from_checkpoint:
@@ -582,15 +588,17 @@ if __name__ == '__main__':
         Batch size: {}
         Positional Encoding: {}
         Attention: {}
+        GPUs: {}
         '''.format(
-            args.batch_size, args.pos_enc, args.attn
+            batch_size, args.pos_enc, args.attn, 
+            torch.cuda.device_count() 
         )
     )
 
     m.fit(
         epochs=args.epochs,
         grad_clip=args.grad_clip,
-        batch_size=args.batch_size,
+        batch_size=batch_size,
         checkpoint_every=10,
         logdir=logdir
     )

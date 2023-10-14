@@ -574,12 +574,17 @@ if __name__ == '__main__':
     m = DistributedDataParallel(m)
     m = m.to_device(device)
 
-    logdir = os.path.join('logs', time.strftime("%Y-%m-%dT%H-%M-%S") + '-' + args.name)
     if args.from_checkpoint:
         m.load(args.from_checkpoint)
         # use the folder with checkpoint as a logdir
         logdir = os.path.dirname(args.from_checkpoint)
 
+    config = 'B:{} PE:{} Att:{} E:{}'.format(args.batch_size, args.pos_enc, args.attn, args.epochs)
+    config_dir = os.path.join('logs', config)
+    logdir = os.path.join(config_dir, time.strftime("%Y-%m-%dT%H-%M-%S") + '-' + args.name)
+
+    if not os.path.exists(config_dir):
+        os.mkdir(config_dir)
     if not os.path.exists(logdir):
         os.mkdir(logdir)
 

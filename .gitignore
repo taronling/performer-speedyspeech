@@ -16,3 +16,5 @@ synthesized_audio/*
 tts/
 .python-version
 code/datasets/data/LJSpeech-1.1.tar.bz2
+checkpoints/melgan.pth
+checkpoints/speedyspeech.pth

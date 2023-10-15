@@ -146,8 +146,9 @@ class DurationExtractor(nn.Module):
     """The teacher model for duration extraction"""
     def __init__(
             self,
-            positional_encoding,
-            attention_mechanism,
+            positional_encoding='rotary',
+            attention_mechanism='fast',
+            device='cuda',
             adam_lr=0.002,
             warmup_epochs=30,
             init_scale=0.25,
@@ -558,6 +559,7 @@ if __name__ == '__main__':
     m = DurationExtractor(
         positional_encoding=args.pos_enc,
         attention_mechanism=args.attn,
+        device=device,
         adam_lr=args.adam_lr,
         warmup_epochs=args.warmup_epochs
     )
@@ -579,7 +581,7 @@ if __name__ == '__main__':
         # use the folder with checkpoint as a logdir
         logdir = os.path.dirname(args.from_checkpoint)
 
-    config = 'B:{} PE:{} Att:{} E:{}'.format(args.batch_size, args.pos_enc, args.attn, args.epochs)
+    config = 'B{}PE{}Att{}E{}'.format(args.batch_size, args.pos_enc, args.attn, args.epochs)
     config_dir = os.path.join('logs', config)
     logdir = os.path.join(config_dir, time.strftime("%Y-%m-%dT%H-%M-%S") + '-' + args.name)
 
